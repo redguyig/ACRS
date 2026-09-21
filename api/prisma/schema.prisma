@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          String    // student, faculty, admin
+  courseId      String?
+  course        Course?   @relation(fields: [courseId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  assignmentsCreated Assignment[] @relation("AssignmentCreator")
+  submissions         Submission[] @relation("StudentSubmissions")
+  comments            Comment[]    @relation("FacultyComments")
+  rubricScores        RubricScore[]    @relation("UserRubricScores")
+  plagiarismAsA       Plagiarism[] @relation("StudentA")
+  plagiarismAsB       Plagiarism[] @relation("StudentB")
+
+  @@index([email])
+  @@index([courseId])
+}
+
+model Course {
+  id           String       @id @default(uuid())
+  name         String
+  department   String
+  batchYear    Int
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  users        User[]
+  assignments  Assignment[]
+}
+
+model Assignment {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  language    String   // cpp, python, javascript, java
+  deadline    DateTime
+  rubricJson  String   // JSON string: [{ criterion: string, maxScore: number }]
+  anonymous   Boolean  @default(false)
+  createdBy   String
+  creator     User     @relation("AssignmentCreator", fields: [createdBy], references: [id])
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  submissions Submission[]
+  plagiarism  Plagiarism[]
+
+  @@index([courseId])
+  @@index([createdBy])
+}
+
+model Submission {
+  id            String   @id @default(uuid())
+  assignmentId  String
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       User     @relation("StudentSubmissions", fields: [studentId], references: [id])
+  codeContent   String
+  language      String
+  submittedAt   DateTime @default(now())
+  status        String   @default("submitted") // pending, submitted, reviewed
+
+  comments      Comment[]
+  rubricScores  RubricScore[]
+  feedback      Feedback?
+
+  @@unique([assignmentId, studentId])
+  @@index([assignmentId])
+  @@index([studentId])
+}
+
+model Comment {
+  id           String   @id @default(uuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  facultyId    String
+  faculty      User     @relation("FacultyComments", fields: [facultyId], references: [id])
+  lineNumber   Int
+  content      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([submissionId])
+  @@index([facultyId])
+}
+
+model RubricScore {
+  id             String @id @default(uuid())
+  submissionId   String
+  submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?    @relation("UserRubricScores", fields: [userId], references: [id])
+  criterion      String
+  maxScore       Int
+  awardedScore   Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([submissionId])
+  @@index([userId])
+}
+
+model Feedback {
+  id              String   @id @default(uuid())
+  submissionId    String   @unique
+  submission      Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  generalComment  String?
+  totalGrade      Float
+  publishedAt     DateTime @default(now())
+}
+
+model Plagiarism {
+  id              String   @id @default(uuid())
+  assignmentId    String
+  assignment      Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentAId      String
+  studentA        User     @relation("StudentA", fields: [studentAId], references: [id])
+  studentBId      String
+  studentB        User     @relation("StudentB", fields: [studentBId], references: [id])
+  similarityPct   Float
+  status          String   @default("flagged") // flagged, reviewed, escalated
+  mossReportUrl   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([assignmentId])
+  @@index([studentAId, studentBId])
+}
+
+model JobQueue {
+  id        String   @id @default(uuid())
+  type      String
+  payload   String   // JSON string
+  status    String   @default("pending") // pending, running, completed, failed
+  result    String?  // JSON string
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  startedAt DateTime?
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([type])
+}
