@@ -241,4 +241,4 @@ For production, consider:
 
 ## License
 
-MIT License - Academic project for B.Tech CSE Minor Project
+MIT License
