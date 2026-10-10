@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Role } from '@/types';
 import { authApi } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AuthContextType {
   user: User | null;
@@ -38,9 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.data.user);
   };
 
+  const queryClient = useQueryClient();
+
   const logout = async () => {
     await authApi.logout();
     setUser(null);
+    queryClient.clear();
   };
 
   return (

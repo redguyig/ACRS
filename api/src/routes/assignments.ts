@@ -25,10 +25,7 @@ const updateAssignmentSchema = createAssignmentSchema.partial();
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   const { courseId, role, userId } = req.user!;
 
-  const where: any = { courseId };
-  if (role === 'student') {
-    where.deadline = { gte: new Date() };
-  }
+  const where: any = courseId ? { courseId } : {};
 
   const assignments = await prisma.assignment.findMany({
     where,
@@ -43,7 +40,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     let status: 'pending' | 'submitted' | 'reviewed' = 'pending';
     const submission = a.submissions[0];
     if (submission) {
-      status = submission.status;
+      status = submission.status as 'pending' | 'submitted' | 'reviewed';
     }
     const isOverdue = new Date(a.deadline) < new Date() && status !== 'reviewed';
     return {
@@ -102,7 +99,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   let status: 'pending' | 'submitted' | 'reviewed' = 'pending';
   const submission = assignment.submissions[0];
   if (submission) {
-    status = submission.status;
+    status = submission.status as 'pending' | 'submitted' | 'reviewed';
   }
 
   res.json({

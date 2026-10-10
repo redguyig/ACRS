@@ -60,6 +60,7 @@ export const assignmentApi = {
 };
 
 export const submissionApi = {
+  listMy: () => api.get('/submissions/my'),
   create: (data: { assignmentId: string; code: string; language: string }) =>
     api.post('/submissions', data),
   get: (id: string) => api.get(`/submissions/${id}`),

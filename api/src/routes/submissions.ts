@@ -65,6 +65,26 @@ async function extractCodeFromFile(file: Express.Multer.File): Promise<string> {
   return file.buffer.toString('utf-8');
 }
 
+// GET /submissions/my — student's own submissions
+router.get('/my', authenticate, requireRole('student'), async (req: AuthRequest, res: Response) => {
+  const submissions = await prisma.submission.findMany({
+    where: { studentId: req.user!.userId },
+    include: {
+      assignment: { include: { course: true } },
+      rubricScores: true,
+      feedback: true,
+    },
+    orderBy: { submittedAt: 'desc' },
+  });
+
+  res.json({
+    data: submissions.map(s => ({
+      ...s,
+      assignment: { ...s.assignment, rubric: JSON.parse(s.assignment.rubricJson) },
+    })),
+  });
+});
+
 router.post('/', authenticate, requireRole('student'), upload.single('file'), async (req: AuthRequest, res: Response) => {
   let code = req.body.code;
   const assignmentId = req.body.assignmentId;
@@ -85,6 +105,30 @@ router.post('/', authenticate, requireRole('student'), upload.single('file'), as
   const assignment = await prisma.assignment.findUnique({ where: { id: assignmentId } });
   if (!assignment) {
     throw new AppError('Assignment not found', 404);
+  }
+
+  if (assignment.language !== language) {
+    throw new AppError(`This assignment requires ${assignment.language} code.`, 400);
+  }
+
+  // Heuristic keyword scanning to prevent wrong-language submissions
+  const codeLower = code.toLowerCase();
+  if (assignment.language === 'cpp' || assignment.language === 'c') {
+    if ((codeLower.includes('def ') || codeLower.includes('import ') || codeLower.includes('console.log')) && !codeLower.includes('#include')) {
+      throw new AppError('Code does not appear to be C/C++.', 400);
+    }
+  } else if (assignment.language === 'python') {
+    if (codeLower.includes('public class') || codeLower.includes('#include') || codeLower.includes('std::') || codeLower.includes('console.log')) {
+      throw new AppError('Code does not appear to be Python.', 400);
+    }
+  } else if (assignment.language === 'java') {
+    if (codeLower.includes('def ') || codeLower.includes('#include') || codeLower.includes('console.log')) {
+      throw new AppError('Code does not appear to be Java.', 400);
+    }
+  } else if (assignment.language === 'javascript') {
+    if (codeLower.includes('#include') || codeLower.includes('public class') || codeLower.includes('def ') || codeLower.includes('std::')) {
+      throw new AppError('Code does not appear to be JavaScript.', 400);
+    }
   }
 
   if (new Date() > assignment.deadline) {
@@ -156,7 +200,7 @@ router.patch('/:id/rubric', authenticate, requireRole('faculty'), validate(rubri
   const { rubricScores } = req.body;
 
   await prisma.$transaction(
-    rubricScores.map(rs => 
+    rubricScores.map((rs: { criterion: string, maxScore: number, awardedScore: number }) => 
       prisma.rubricScore.upsert({
         where: { id: `${req.params.id}-${rs.criterion}` },
         create: {

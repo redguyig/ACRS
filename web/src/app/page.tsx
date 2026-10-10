@@ -9,17 +9,21 @@ export default function Home() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (!loading && user) {
-      switch (user.role) {
-        case 'student':
-          router.push('/student/assignments');
-          break;
-        case 'faculty':
-          router.push('/faculty/assignments');
-          break;
-        case 'admin':
-          router.push('/admin/users');
-          break;
+    if (!loading) {
+      if (user) {
+        switch (user.role) {
+          case 'student':
+            router.push('/student/assignments');
+            break;
+          case 'faculty':
+            router.push('/faculty/assignments');
+            break;
+          case 'admin':
+            router.push('/admin/users');
+            break;
+        }
+      } else {
+        router.push('/login');
       }
     }
   }, [user, loading, router]);

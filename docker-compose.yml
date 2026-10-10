@@ -8,8 +8,11 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - web
-      - api
+      web:
+        condition: service_started
+      api:
+        condition: service_started
+    restart: unless-stopped
 
   web:
     build: ./web
@@ -19,9 +22,9 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./web:/app
-      - /app/node_modules
-      - /app/.next
+      - ./web/src:/app/src
+      - ./web/public:/app/public
+    restart: unless-stopped
 
   api:
     build: ./api
@@ -36,6 +39,7 @@ services:
       - /app/node_modules
     depends_on:
       - moss-worker
+    restart: unless-stopped
 
   moss-worker:
     build: ./moss-worker
@@ -44,3 +48,4 @@ services:
       - MOSS_USER_ID=${MOSS_USER_ID:-0}
     volumes:
       - ./moss-worker:/app
+    restart: unless-stopped
